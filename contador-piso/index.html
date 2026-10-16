@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Contador en el piso</title>
+<style>
+@font-face{font-family:"Rock Salt";src:url(fonts/RockSalt.woff2) format("woff2");font-display:block}
+:root{
+  --tiza:#f3ecff;      /* trazo de tiza, igual que "P 26 3/3" */
+  --brillo:#9a5cff;    /* resplandor violeta */
+  --rojo-tiza:#ffe1e1;
+  --rojo:#ff2638;
+}
+html,body{margin:0;height:100%;background:#000;overflow:hidden}
+body{cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+body.export{cursor:none}
+
+/* El escenario usa las coordenadas de la imagen original (768x1364) y se escala para llenar la pantalla. */
+#marco{position:absolute;left:50%;top:50%;width:768px;height:1364px;overflow:hidden;transform-origin:50% 50%}
+#escena{position:absolute;inset:0;perspective:700px;perspective-origin:384px 770px}
+#fondo{position:absolute;inset:0;width:100%;height:100%;display:block}
+.capa{position:absolute;inset:0;pointer-events:none}
+
+/* Plano del piso: su borde inferior coincide con el filo del piso (y=1093) y se acuesta hacia el fondo. */
+#piso{position:absolute;left:-316px;top:-307px;width:1400px;height:1400px;transform-origin:50% 100%;transform:rotateX(90deg);mix-blend-mode:screen;pointer-events:none}
+#piso svg{position:absolute;inset:0;width:100%;height:100%;overflow:hidden}
+#luz{position:absolute;left:700px;top:980px;width:1100px;height:1100px;margin:-550px 0 0 -550px;border-radius:50%;
+  background:radial-gradient(closest-side,var(--luz-a,rgba(150,92,255,.55)),var(--luz-b,rgba(100,60,255,.16)) 48%,transparent)}
+
+.num{position:absolute;left:700px;top:980px;font-family:"Rock Salt",cursive;font-size:330px;line-height:1;white-space:nowrap;
+  transform-origin:50% 50%;will-change:transform,opacity,filter}
+.num span{position:absolute;left:0;top:0;transform:translate(-50%,-56%)}
+.num .halo{color:var(--brillo);filter:blur(22px);opacity:.95}
+.num .trazo{color:var(--tiza);filter:url(#tiza);text-shadow:0 0 6px var(--brillo),0 0 18px var(--brillo)}
+.num.urgente{--tiza:var(--rojo-tiza);--brillo:var(--rojo)}
+
+#anillo,#marcas{filter:url(#tiza-fina)}
+#anillo{fill:none;stroke:var(--tiza);stroke-width:9;stroke-linecap:round}
+#anillo-halo{fill:none;stroke:var(--brillo);stroke-width:30;opacity:.55;filter:blur(10px)}
+#marcas line{stroke:var(--tiza);stroke-width:7;stroke-linecap:round;transition:none}
+#marcas line.apagada{opacity:.12}
+#onda{fill:none;stroke:var(--brillo)}
+#piso.urgente{--tiza:var(--rojo-tiza);--brillo:var(--rojo);--luz-a:rgba(255,40,60,.55);--luz-b:rgba(200,20,40,.18)}
+
+.niebla{position:absolute;left:0;width:1536px;background-repeat:repeat-x;pointer-events:none;will-change:transform}
+#niebla1{top:760px;height:604px;opacity:.55}
+#niebla2{top:840px;height:524px;opacity:.38}
+#sombra{background:#000;opacity:0}
+#viñeta{background:radial-gradient(ellipse 75% 60% at 50% 62%,transparent 60%,rgba(0,0,0,.35))}
+#motas{mix-blend-mode:screen}
+#destello{background:radial-gradient(ellipse 80% 55% at 50% 72%,rgba(255,30,50,.75),rgba(120,0,20,.35) 60%,transparent);opacity:0;mix-blend-mode:screen}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- Bordes ásperos + grano de tiza -->
+    <filter id="tiza" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4" result="ondas"/>
+      <feDisplacementMap in="SourceGraphic" in2="ondas" scale="9" xChannelSelector="R" yChannelSelector="G" result="aspero"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="11" result="grano"/>
+      <feColorMatrix in="grano" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.5 1.55" result="mascara"/>
+      <feComposite in="aspero" in2="mascara" operator="in"/>
+    </filter>
+    <filter id="tiza-fina" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="7" result="ondas"/>
+      <feDisplacementMap in="SourceGraphic" in2="ondas" scale="7" xChannelSelector="R" yChannelSelector="G" result="aspero"/>
+      <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="1" seed="2" result="grano"/>
+      <feColorMatrix in="grano" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.4 1.5" result="mascara"/>
+      <feComposite in="aspero" in2="mascara" operator="in"/>
+    </filter>
+  </defs>
+</svg>
+
+<div id="marco">
+  <div id="escena">
+    <img id="fondo" src="fondo.png" alt="">
+    <div id="niebla1" class="niebla"></div>
+    <div id="sombra" class="capa"></div>
+    <div id="piso">
+      <div id="luz"></div>
+      <svg viewBox="0 0 1400 1400" aria-hidden="true">
+        <circle id="onda" cx="700" cy="980" r="0"/>
+        <circle id="anillo-halo" cx="700" cy="980" r="380" transform="rotate(-90 700 980)"/>
+        <circle id="anillo" cx="700" cy="980" r="380" transform="rotate(-90 700 980)"/>
+        <g id="marcas"></g>
+      </svg>
+      <div id="previo" class="num"><span class="halo"></span><span class="trazo"></span></div>
+      <div id="actual" class="num"><span class="halo"></span><span class="trazo"></span></div>
+    </div>
+    <canvas id="motas" class="capa" width="1536" height="2728"></canvas>
+    <div id="niebla2" class="niebla"></div>
+    <div id="viñeta" class="capa"></div>
+    <div id="destello" class="capa"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---------- Configuración (por URL: ?desde=10&hasta=0&paso=1&loop=1) ----------
+  const q = new URLSearchParams(location.search);
+  const entero = (k, def) => { const v = parseInt(q.get(k), 10); return Number.isFinite(v) ? v : def; };
+  const DESDE = entero('desde', 10);
+  const HASTA = entero('hasta', 0);
+  const PASO = Math.max(0.25, parseFloat(q.get('paso')) || 1) * 1000;   // ms por número
+  const LOOP = q.has('loop') && q.get('loop') !== '0';
+  const EXPORT = q.has('export');
+
+  const DIR = HASTA >= DESDE ? 1 : -1;
+  const N = Math.abs(HASTA - DESDE) + 1;
+  const INTRO = 700;           // el anillo se dibuja antes del primer número
+  const FINAL = 2200;          // cuánto se mantiene el último número
+  const DURACION = INTRO + (N - 1) * PASO + FINAL;
+  const ENTRADA = 420, SALIDA = 480;
+
+  // Geometría de la escena (coordenadas de la imagen) para proyectar puntos del piso
+  const W = 768, H = 1364, CX = 384, CY = 770, BORDE = 1093, PERSP = 700;
+  const PROF_NUM = 420;        // profundidad del centro del número dentro del piso
+
+  const $ = id => document.getElementById(id);
+  const marco = $('marco'), escena = $('escena'), piso = $('piso');
+  const actual = $('actual'), previo = $('previo');
+  const anillo = $('anillo'), anilloHalo = $('anillo-halo'), onda = $('onda'), marcas = $('marcas');
+  const sombra = $('sombra'), destello = $('destello');
+  const niebla1 = $('niebla1'), niebla2 = $('niebla2');
+  const motas = $('motas'), ctx = motas.getContext('2d');
+  if (EXPORT) document.body.classList.add('export');
+
+  // ---------- Utilidades ----------
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const easeOut = x => 1 - Math.pow(1 - clamp(x, 0, 1), 3);
+  const easeIn = x => Math.pow(clamp(x, 0, 1), 2);
+  const rng = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const valor = i => DESDE + DIR * i;
+  const esUrgente = i => N > 4 && i >= N - 4;
+
+  // ---------- Encaje en pantalla: cubrir en móviles verticales, contener en pantallas anchas ----------
+  function encajar() {
+    const vw = innerWidth, vh = innerHeight;
+    const s = vw / vh < W / H ? Math.max(vw / W, vh / H) : Math.min(vw / W, vh / H);
+    marco.style.transform = `translate(-50%,-50%) scale(${s})`;
+  }
+  addEventListener('resize', encajar);
+  encajar();
+
+  // ---------- Marcas alrededor del anillo (una por paso) ----------
+  const R = 380, C = 2 * Math.PI * R;
+  const lineas = [];
+  for (let j = 0; j < N - 1; j++) {
+    const a = -Math.PI / 2 + (j + 0.5) / (N - 1) * Math.PI * 2;
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', 700 + Math.cos(a) * (R + 26)); l.setAttribute('y1', 980 + Math.sin(a) * (R + 26));
+    l.setAttribute('x2', 700 + Math.cos(a) * (R + 62)); l.setAttribute('y2', 980 + Math.sin(a) * (R + 62));
+    marcas.appendChild(l); lineas.push(l);
+  }
+
+  // ---------- Textura de niebla (procedural y repetible en horizontal) ----------
+  function texturaNiebla(seed, h, alfa) {
+    const c = document.createElement('canvas'); c.width = 768; c.height = h;
+    const g = c.getContext('2d'), r = rng(seed);
+    for (let k = 0; k < 70; k++) {
+      const x = r() * 768, y = h * (0.15 + r() * 0.85), rad = 60 + r() * 170;
+      for (const dx of [-768, 0, 768]) {
+        const grd = g.createRadialGradient(x + dx, y, 0, x + dx, y, rad);
+        grd.addColorStop(0, `rgba(150,140,230,${alfa * (0.4 + r() * 0.6)})`);
+        grd.addColorStop(1, 'rgba(150,140,230,0)');
+        g.fillStyle = grd; g.beginPath(); g.ellipse(x + dx, y, rad * 1.8, rad * 0.55, 0, 0, Math.PI * 2); g.fill();
+      }
+    }
+    return c.toDataURL();
+  }
+  niebla1.style.backgroundImage = `url(${texturaNiebla(21, 604, 0.10)})`;
+  niebla2.style.backgroundImage = `url(${texturaNiebla(57, 524, 0.08)})`;
+
+  // ---------- Parpadeo de la luz (determinista para poder exportar cuadro a cuadro) ----------
+  const CORTES = [[2.30, .07], [2.42, .05], [5.85, .09], [6.02, .06], [8.71, .05]];
+  function parpadeo(s) {
+    let v = 0.05 + 0.03 * Math.sin(s * 7.3) * Math.sin(s * 2.1 + 1) + 0.02 * Math.sin(s * 23.7);
+    for (const [ini, dur] of CORTES) if (s >= ini && s < ini + dur) v = 0.5;
+    return clamp(v, 0, 1);
+  }
+
+  // ---------- Proyección de un punto del piso a la pantalla ----------
+  // x: desplazamiento lateral desde el centro, prof: profundidad dentro del piso, alto: altura sobre el piso
+  function proyectar(x, prof, alto) {
+    const k = PERSP / (PERSP + prof);
+    return [CX + x * k, CY + (BORDE - alto - CY) * k, k];
+  }
+
+  // ---------- Número ----------
+  const textos = new WeakMap();
+  function ponerNumero(el, texto, op, escala, blur, urgente, brillo) {
+    if (textos.get(el) !== texto) {
+      textos.set(el, texto);
+      for (const s of el.children) s.textContent = texto;
+    }
+    el.classList.toggle('urgente', urgente);
+    el.style.opacity = op;
+    el.style.transform = `scale(${escala}, ${escala * 1.7})`;   // estirado en profundidad para que se lea desde la cámara
+    el.style.filter = blur > 0.05 ? `blur(${blur}px)` : 'none';
+    el.firstElementChild.style.opacity = brillo;
+  }
+
+  function render(t) {
+    const s = t / 1000;
+    const i = t < INTRO ? -1 : Math.min(N - 1, Math.floor((t - INTRO) / PASO));
+    const local = i < 0 ? 0 : t - (INTRO + i * PASO);
+    const final = i === N - 1;
+    const urg = i >= 0 && esUrgente(i);
+    const pulso = final ? 0.5 + 0.5 * Math.sin(local / 1000 * Math.PI * 3) : 0;
+
+    // número actual: aparece "quemándose" en el piso
+    if (i >= 0) {
+      const e = easeOut(local / ENTRADA);
+      const golpe = Math.exp(-local / 260);
+      ponerNumero(actual, String(valor(i)), e, 1.28 - 0.28 * e + (final ? 0.03 * pulso : 0), 16 * (1 - e),
+        urg, clamp(0.75 + 0.9 * golpe + 0.4 * pulso, 0, 1.6));
+    } else {
+      ponerNumero(actual, '', 0, 1, 0, false, 0);
+    }
+    // número anterior: se desvanece como humo
+    if (i >= 1 && local < SALIDA) {
+      const x = easeIn(local / SALIDA);
+      ponerNumero(previo, String(valor(i - 1)), 1 - x, 1 - 0.12 * x, 14 * x, esUrgente(i - 1), 0.75 * (1 - x));
+    } else {
+      ponerNumero(previo, '', 0, 1, 0, false, 0);
+    }
+
+    // anillo: se dibuja en la intro y se va consumiendo hasta el final
+    piso.classList.toggle('urgente', urg);
+    const prog = clamp((t - INTRO) / Math.max(1, (N - 1) * PASO), 0, 1);
+    const resto = t < INTRO ? easeOut(t / INTRO) : 1 - prog;
+    for (const el of [anillo, anilloHalo]) el.style.strokeDasharray = `${C * resto} ${C}`;
+    lineas.forEach((l, j) => l.classList.toggle('apagada', t < INTRO ? j / (N - 1) > resto : j < i));
+
+    // luz en el piso + onda expansiva en cada cambio
+    const golpeLuz = i >= 0 ? Math.exp(-local / 380) : 0;
+    $('luz').style.opacity = clamp((t < INTRO ? easeOut(t / INTRO) * 0.6 : 0.6) + 0.55 * golpeLuz + 0.35 * pulso, 0, 1);
+    if (i >= 0 && local < 900) {
+      const o = easeOut(local / 900);
+      onda.setAttribute('r', 160 + 560 * o);
+      onda.style.strokeWidth = 26 * (1 - o) + 2;
+      onda.style.opacity = 0.9 * (1 - o);
+    } else onda.style.opacity = 0;
+
+    // ambiente
+    niebla1.style.transform = `translateX(${-((s * 22) % 768)}px)`;
+    niebla2.style.transform = `translateX(${-768 + ((s * 34) % 768)}px)`;
+    sombra.style.opacity = parpadeo(s);
+
+    // final: destello rojo y sacudida
+    if (final) {
+      destello.style.opacity = clamp(0.95 * Math.exp(-local / 420) + 0.18 * pulso, 0, 1);
+      const sac = 9 * Math.exp(-local / 220), r = rng(Math.floor(local / 33) + 99);
+      escena.style.transform = sac > 0.2 ? `translate(${(r() - .5) * sac}px, ${(r() - .5) * sac}px) scale(1.02)` : 'none';
+    } else {
+      destello.style.opacity = 0;
+      escena.style.transform = 'none';
+    }
+
+    dibujarMotas(t, i);
+  }
+
+  // ---------- Motas de polvo / brasas que suben desde el número ----------
+  function dibujarMotas(t, iActual) {
+    ctx.setTransform(2, 0, 0, 2, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = Math.max(0, iActual - 2); i <= iActual; i++) {
+      const local = t - (INTRO + i * PASO);
+      if (local < 0) continue;
+      const r = rng(1000 + i * 31), roja = esUrgente(i);
+      for (let k = 0; k < 22; k++) {
+        const vida = 1300 + r() * 900, x0 = (r() - .5) * 520, prof = PROF_NUM + (r() - .5) * 420;
+        const vel = 60 + r() * 130, deriva = (r() - .5) * 60, tam = 0.8 + r() * 1.8, ret = r() * 160;
+        const u = (local - ret) / vida;
+        if (u < 0 || u > 1) continue;
+        const [px, py, k2] = proyectar(x0 + deriva * u, prof, vel * u * (vida / 1000));
+        const a = Math.sin(Math.PI * u) * 0.85;
+        const rad = tam * k2 * 2.2;
+        const grd = ctx.createRadialGradient(px, py, 0, px, py, rad * 3);
+        grd.addColorStop(0, roja ? `rgba(255,170,170,${a})` : `rgba(235,220,255,${a})`);
+        grd.addColorStop(0.35, roja ? `rgba(255,40,60,${a * 0.5})` : `rgba(150,95,255,${a * 0.5})`);
+        grd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grd;
+        ctx.beginPath(); ctx.arc(px, py, rad * 3, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+  }
+
+  // ---------- Reproducción ----------
+  let inicio = 0;
+  const reiniciar = () => { inicio = performance.now(); };
+  function cuadro(now) {
+    let t = now - inicio;
+    if (t >= DURACION) { if (LOOP) { reiniciar(); t = 0; } else t = DURACION; }
+    render(t);
+    requestAnimationFrame(cuadro);
+  }
+
+  // Para exportar a video cuadro a cuadro (ver render.mjs)
+  window.contador = { duracion: DURACION, render };
+
+  if (!EXPORT) {
+    addEventListener('pointerdown', reiniciar);
+    addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'Enter') reiniciar(); });
+    document.fonts.load('330px "Rock Salt"').finally(() => { reiniciar(); requestAnimationFrame(cuadro); });
+  } else {
+    render(0);
+  }
+})();
+</script>
+</body>
+</html>
