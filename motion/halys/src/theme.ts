@@ -1,0 +1,23 @@
+// Colores de marca medidos sobre el logo original + paleta de la hamburguesa.
+export const C = {
+	black: '#050806',
+	green: '#004721',
+	greenLight: '#12804A',
+	ring: '#30684A',
+	white: '#FFFFFF',
+	cream: '#FFF4DF',
+	bunTop: '#FFC56E',
+	bun: '#F2A23E',
+	bunDark: '#D27020',
+	sesame: '#FFF1D0',
+	sesameEdge: '#E9C98C',
+	lettuce: '#8BCB4C',
+	lettuceDark: '#5C9F2E',
+	tomato: '#E8412E',
+	tomatoLight: '#F7826F',
+	cheese: '#FFC233',
+	cheeseDark: '#EE9F12',
+	patty: '#6E3720',
+	pattyDark: '#45200E',
+	pattyLight: '#8F4E2C',
+};
