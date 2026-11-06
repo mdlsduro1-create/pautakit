@@ -5,7 +5,8 @@
   "scripts": {
     "studio": "remotion studio",
     "render": "remotion render HalysReel out/halys-reel.mp4",
-    "still": "remotion still HalysReel out/preview.png --frame=360"
+    "still": "remotion still HalysReel out/preview.png --frame=360",
+    "sfx": "python3 scripts/sfx.py public/sfx"
   },
   "dependencies": {
     "@remotion/cli": "4.0.539",

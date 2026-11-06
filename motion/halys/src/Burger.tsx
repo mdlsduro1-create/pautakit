@@ -15,6 +15,10 @@ const LAYERS = [
 	{at: 45, tilt: 12}, // pan de arriba
 ];
 export const BURGER_LANDED = LAYERS[LAYERS.length - 1].at + DROP;
+// Frame (relativo al inicio) en que aterriza cada capa: lo usa la banda sonora.
+export const LAYER_LANDINGS = LAYERS.map((l) => l.at + DROP);
+export const SEEDS_START = BURGER_LANDED + 2;
+export const SHINE_START = BURGER_LANDED + 30;
 const BOTTOM = 242; // base de la hamburguesa: origen del aplastamiento
 
 const TOP_BUN =
@@ -50,8 +54,11 @@ const SPOTS: [number, number, number][] = [
 	[35, 122, 7], [85, 142, 5], [130, 126, 6], [180, 148, 7], [225, 124, 5], [262, 142, 6],
 ];
 const STEAM_X = [-110, 0, 110];
+const SPEED_LINES = [-165, -55, 55, 165];
+const PUFFS: [number, number][] = [[-230, 1], [-120, 0.75], [120, 0.75], [230, 1]];
 
-export const Burger: React.FC<{start: number}> = ({start}) => {
+// start: empiezan a caer las capas. crouchAt/launchAt: se agacha y sale disparada hacia arriba.
+export const Burger: React.FC<{start: number; crouchAt: number; launchAt: number}> = ({start, crouchAt, launchAt}) => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
 	const t = frame - start;
@@ -82,6 +89,19 @@ export const Burger: React.FC<{start: number}> = ({start}) => {
 	});
 	const steam = interpolate(t, [BURGER_LANDED + 18, BURGER_LANDED + 50], [0, 1], clamp);
 
+	// Salto final: anticipación (se aplasta), estirón y despegue.
+	const crouch = interpolate(frame, [crouchAt, launchAt], [0, 1], {...clamp, easing: smooth});
+	const bent = crouch * interpolate(frame, [launchAt, launchAt + 5], [1, 0], clamp);
+	const stretch = interpolate(frame, [launchAt, launchAt + 6, launchAt + 24], [0, 1, 0.5], clamp);
+	const launch = interpolate(frame, [launchAt, launchAt + 24], [0, 1], {
+		...clamp,
+		easing: Easing.bezier(0.45, 0, 0.8, 0.4),
+	});
+	const jumpScaleX = (1 + 0.1 * bent) * (1 - 0.12 * stretch);
+	const jumpScaleY = (1 - 0.16 * bent) * (1 + 0.24 * stretch);
+	const speedLines = interpolate(frame, [launchAt, launchAt + 4, launchAt + 20], [0, 0.7, 0], clamp);
+	const puff = interpolate(frame, [launchAt, launchAt + 26], [0, 1], {...clamp, easing: easeOut});
+
 	return (
 		<g>
 			<defs>
@@ -102,6 +122,9 @@ export const Burger: React.FC<{start: number}> = ({start}) => {
 					<stop offset="0" stopColor={C.cheese} />
 					<stop offset="1" stopColor={C.cheeseDark} />
 				</linearGradient>
+				<filter id="puff-blur" x="-50%" y="-50%" width="200%" height="200%">
+					<feGaussianBlur stdDeviation={9} />
+				</filter>
 				<clipPath id="bun-clip">
 					<path d={TOP_BUN} />
 				</clipPath>
@@ -111,101 +134,135 @@ export const Burger: React.FC<{start: number}> = ({start}) => {
 			<ellipse
 				cx={0}
 				cy={BOTTOM + 16}
-				rx={280 * (0.3 + 0.7 * ground) * (1 + 0.04 * squash)}
+				rx={280 * (0.3 + 0.7 * ground) * (1 + 0.04 * squash + 0.1 * bent) * (1 - 0.8 * launch)}
 				ry={22}
 				fill="#000"
-				opacity={0.3 * ground}
+				opacity={0.3 * ground * (1 - launch)}
 			/>
 
-			{/* vapor */}
-			{steam > 0 &&
-				STEAM_X.map((x, i) => (
-					<path
-						key={x}
-						d={`M${x} -225C${x + 26} -262 ${x - 26} -298 ${x} -335C${x + 26} -372 ${x - 26} -405 ${x} -440`}
-						fill="none"
-						stroke="#fff"
-						strokeWidth={9}
-						strokeLinecap="round"
-						pathLength={200}
-						strokeDasharray="60 140"
-						strokeDashoffset={-(t * 1.6 + i * 70)}
-						opacity={0.4 * steam}
-					/>
-				))}
+			{/* polvito al despegar */}
+			{puff > 0 && puff < 1 && (
+				<g filter="url(#puff-blur)" opacity={0.4 * (1 - puff)}>
+					{PUFFS.map(([x, size]) => (
+						<circle
+							key={x}
+							cx={x * (1 + 0.6 * puff)}
+							cy={BOTTOM + 6 - 34 * puff * size}
+							r={56 * size * (0.45 + 0.7 * puff)}
+							fill="#fff"
+						/>
+					))}
+				</g>
+			)}
 
 			<g
-				transform={`translate(0 ${BOTTOM}) scale(${1 + 0.045 * squash} ${1 - 0.06 * squash}) translate(0 ${-BOTTOM})`}
+				transform={`translate(0 ${-1900 * launch}) translate(0 ${BOTTOM}) rotate(${-10 * launch}) scale(${jumpScaleX} ${jumpScaleY}) translate(0 ${-BOTTOM})`}
 			>
-				{layer(0, <path d={BOTTOM_BUN} fill="url(#bun-bottom)" />)}
-				{layer(
-					1,
-					<>
-						<rect x={-302} y={86} width={604} height={80} rx={40} fill="url(#patty)" />
-						<rect x={-268} y={95} width={536} height={12} rx={6} fill={C.pattyLight} opacity={0.6} />
-						{SPOTS.map(([x, y, r]) => (
-							<ellipse key={x} cx={x} cy={y} rx={r * 1.6} ry={r} fill={C.pattyDark} opacity={0.6} />
-						))}
-					</>,
-				)}
-				{layer(
-					2,
-					<>
-						<rect x={-300} y={70} width={600} height={24} rx={6} fill="url(#cheese)" />
-						{CHEESE_TIPS.map((d) => (
-							<path key={d} d={d} fill="url(#cheese)" />
-						))}
-						<g transform={`translate(0 88) scale(1 ${drips}) translate(0 -88)`}>
-							{DRIPS.map((d) => (
+				{speedLines > 0 &&
+					SPEED_LINES.map((x, i) => (
+						<line
+							key={x}
+							x1={x}
+							x2={x}
+							y1={BOTTOM + 40}
+							y2={BOTTOM + 40 + (i % 2 ? 300 : 220)}
+							stroke="#fff"
+							strokeWidth={10}
+							strokeLinecap="round"
+							opacity={speedLines}
+						/>
+					))}
+
+				{/* vapor */}
+				{steam > 0 &&
+					STEAM_X.map((x, i) => (
+						<path
+							key={x}
+							d={`M${x} -225C${x + 26} -262 ${x - 26} -298 ${x} -335C${x + 26} -372 ${x - 26} -405 ${x} -440`}
+							fill="none"
+							stroke="#fff"
+							strokeWidth={9}
+							strokeLinecap="round"
+							pathLength={200}
+							strokeDasharray="60 140"
+							strokeDashoffset={-(t * 1.6 + i * 70)}
+							opacity={0.4 * steam}
+						/>
+					))}
+
+				<g
+					transform={`translate(0 ${BOTTOM}) scale(${1 + 0.045 * squash} ${1 - 0.06 * squash}) translate(0 ${-BOTTOM})`}
+				>
+					{layer(0, <path d={BOTTOM_BUN} fill="url(#bun-bottom)" />)}
+					{layer(
+						1,
+						<>
+							<rect x={-302} y={86} width={604} height={80} rx={40} fill="url(#patty)" />
+							<rect x={-268} y={95} width={536} height={12} rx={6} fill={C.pattyLight} opacity={0.6} />
+							{SPOTS.map(([x, y, r]) => (
+								<ellipse key={x} cx={x} cy={y} rx={r * 1.6} ry={r} fill={C.pattyDark} opacity={0.6} />
+							))}
+						</>,
+					)}
+					{layer(
+						2,
+						<>
+							<rect x={-300} y={70} width={600} height={24} rx={6} fill="url(#cheese)" />
+							{CHEESE_TIPS.map((d) => (
 								<path key={d} d={d} fill="url(#cheese)" />
 							))}
-						</g>
-					</>,
-				)}
-				{layer(
-					3,
-					<>
-						{[-276, 8].map((x) => (
-							<g key={x}>
-								<rect x={x} y={40} width={268} height={36} rx={16} fill={C.tomato} />
-								<rect x={x + 8} y={47} width={252} height={22} rx={10} fill={C.tomatoLight} opacity={0.55} />
+							<g transform={`translate(0 88) scale(1 ${drips}) translate(0 -88)`}>
+								{DRIPS.map((d) => (
+									<path key={d} d={d} fill="url(#cheese)" />
+								))}
 							</g>
-						))}
-					</>,
-				)}
-				{layer(4, <path d={LETTUCE} fill={C.lettuce} stroke={C.lettuceDark} strokeWidth={4} strokeLinejoin="round" />)}
-				{layer(
-					5,
-					<>
-						<path d={TOP_BUN} fill="url(#bun-top)" />
-						<ellipse cx={-120} cy={-140} rx={72} ry={22} fill="#fff" opacity={0.3} transform="rotate(-20 -120 -140)" />
-						{SEEDS.map(([x, y, rot], i) => {
-							const s = spring({
-								frame: sinceLanding(topAt) - 2 - i * 2,
-								fps,
-								config: {damping: 10, stiffness: 220, mass: 0.5},
-							});
-							return (
-								<ellipse
-									key={i}
-									cx={0}
-									cy={0}
-									rx={7}
-									ry={13}
-									fill={C.sesame}
-									stroke={C.sesameEdge}
-									strokeWidth={1.5}
-									transform={`translate(${x} ${y}) rotate(${rot}) scale(${s})`}
-								/>
-							);
-						})}
-						{shine > -460 && shine < 460 && (
-							<g clipPath="url(#bun-clip)">
-								<rect x={shine - 40} y={-240} width={70} height={300} fill="#fff" opacity={0.35} transform={`skewX(-22)`} />
-							</g>
-						)}
-					</>,
-				)}
+						</>,
+					)}
+					{layer(
+						3,
+						<>
+							{[-276, 8].map((x) => (
+								<g key={x}>
+									<rect x={x} y={40} width={268} height={36} rx={16} fill={C.tomato} />
+									<rect x={x + 8} y={47} width={252} height={22} rx={10} fill={C.tomatoLight} opacity={0.55} />
+								</g>
+							))}
+						</>,
+					)}
+					{layer(4, <path d={LETTUCE} fill={C.lettuce} stroke={C.lettuceDark} strokeWidth={4} strokeLinejoin="round" />)}
+					{layer(
+						5,
+						<>
+							<path d={TOP_BUN} fill="url(#bun-top)" />
+							<ellipse cx={-120} cy={-140} rx={72} ry={22} fill="#fff" opacity={0.3} transform="rotate(-20 -120 -140)" />
+							{SEEDS.map(([x, y, rot], i) => {
+								const s = spring({
+									frame: sinceLanding(topAt) - 2 - i * 2,
+									fps,
+									config: {damping: 10, stiffness: 220, mass: 0.5},
+								});
+								return (
+									<ellipse
+										key={i}
+										cx={0}
+										cy={0}
+										rx={7}
+										ry={13}
+										fill={C.sesame}
+										stroke={C.sesameEdge}
+										strokeWidth={1.5}
+										transform={`translate(${x} ${y}) rotate(${rot}) scale(${s})`}
+									/>
+								);
+							})}
+							{shine > -460 && shine < 460 && (
+								<g clipPath="url(#bun-clip)">
+									<rect x={shine - 40} y={-240} width={70} height={300} fill="#fff" opacity={0.35} transform={`skewX(-22)`} />
+								</g>
+							)}
+						</>,
+					)}
+				</g>
 			</g>
 		</g>
 	);

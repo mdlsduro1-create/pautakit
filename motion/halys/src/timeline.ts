@@ -1,6 +1,6 @@
 // Todo el guion de la pieza, en frames (60 fps).
 export const FPS = 60;
-export const DURATION = 660;
+export const DURATION = 690;
 
 export const T = {
 	logoIn: 6, // entran las letras del logo
@@ -10,8 +10,25 @@ export const T = {
 	title: 196, // "HAMBURGUESAS"
 	tagline: 300, // "que te hacen sonreír"
 	sceneOut: 414, // salen los textos
-	irisClose: 444, // el verde se cierra de nuevo en el círculo del logo
-	logoBack: 462, // vuelven las letras
-	lift: 532, // el logo sube para dejar sitio al cierre
-	endText: 548, // "HAMBURGUESAS" final
+	burgerCrouch: 426, // la hamburguesa se agacha para saltar...
+	burgerLaunch: 440, // ...y sale disparada hacia arriba
+	irisClose: 446, // el verde se cierra de nuevo en el círculo del logo
+	logoBack: 470, // las letras caen dentro del círculo
+	badge: 546, // la etiqueta "HAMBURGUESAS" se pega bajo el logo
+	wink: 622, // guiño final
 };
+
+// Entrada de las letras: "pop" (inicio) o "drop" (caen desde arriba, en el cierre).
+export type LetterEntry = 'pop' | 'drop';
+export const LETTER_STAGGER: Record<LetterEntry, number> = {pop: 4, drop: 5};
+export const DROP_FALL = 16;
+
+// Frame en que cada letra termina de entrar (aparece o aterriza).
+export const letterIn = (entry: LetterEntry, start: number, i: number) =>
+	start + i * LETTER_STAGGER[entry] + (entry === 'drop' ? DROP_FALL : 2);
+
+export const smileStartFor = (entry: LetterEntry, start: number) =>
+	entry === 'pop' ? start + 34 : letterIn('drop', start, 5) + 5;
+
+// Frames que tarda la etiqueta del cierre en "estamparse" sobre el logo.
+export const BADGE_STAMP = 8;

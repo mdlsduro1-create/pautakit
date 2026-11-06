@@ -1,16 +1,48 @@
 import React from 'react';
-import {AbsoluteFill, interpolate, random, spring, useCurrentFrame, useVideoConfig} from 'remotion';
-import {clamp, easeIn, easeOut, smooth, wobble} from './anim';
+import {AbsoluteFill, Easing, interpolate, random, spring, useCurrentFrame, useVideoConfig} from 'remotion';
+import {clamp, easeOut, smooth, wobble} from './anim';
 import {Burger} from './Burger';
 import {FONT} from './fonts';
 import {DrawnSmile, LogoMark} from './Logo';
 import {C} from './theme';
-import {T} from './timeline';
+import {Soundtrack} from './Soundtrack';
+import {BADGE_STAMP, letterIn, T} from './timeline';
 
 const LOGO_SCALE = 0.82; // radio del círculo: 500 * 0.82 = 410 px
 const COVER = 3.1; // escala del círculo para tapar toda la pantalla vertical
 const BURGER_Y = 1000;
 const BURGER_SCALE = 1.08;
+const END_SHIFT = -40; // en el cierre el logo queda un poco más arriba para dejar sitio a la etiqueta
+const BADGE_OFFSET = 400; // la etiqueta se pega sobre el borde inferior del círculo (radio 410 px)
+
+// Destellos alrededor del logo: [ángulo, distancia en px, tamaño, color]
+const SPARKLES: [number, number, number, string][] = [
+	[-165, 500, 46, C.cream], [-132, 535, 32, C.cheese], [-100, 495, 38, C.white], [-68, 530, 30, C.cheese],
+	[-30, 505, 48, C.cream], [8, 545, 32, C.white], [172, 540, 36, C.cheese], [-84, 590, 24, C.cream],
+];
+const STAR = 'M0 -1C0.14 -0.14 0.14 -0.14 1 0C0.14 0.14 0.14 0.14 0 1C-0.14 0.14 -0.14 0.14 -1 0C-0.14 -0.14 -0.14 -0.14 0 -1Z';
+
+const Sparkle: React.FC<{x: number; y: number; size: number; color: string; at: number; drift?: number}> = ({
+	x,
+	y,
+	size,
+	color,
+	at,
+	drift = 0,
+}) => {
+	const frame = useCurrentFrame();
+	const {fps} = useVideoConfig();
+	const s = spring({frame: frame - at, fps, config: {damping: 12, stiffness: 200, mass: 0.6}});
+	const out = interpolate(frame, [at + 14, at + 34], [0, 1], {...clamp, easing: smooth});
+	if (s <= 0 || out >= 1) return null;
+	return (
+		<path
+			d={STAR}
+			fill={color}
+			transform={`translate(${x * (1 + drift * out)} ${y * (1 + drift * out)}) rotate(${90 * s + (frame - at) * 2}) scale(${size * s * (1 - out)})`}
+		/>
+	);
+};
 
 // Anillos que salen del círculo cuando aparece.
 const Ripple: React.FC<{at: number}> = ({at}) => {
@@ -112,25 +144,36 @@ export const HalysReel: React.FC = () => {
 	const close = spring({frame: frame - T.irisClose, fps, config: {damping: 15, stiffness: 85}});
 	const iris = pop * (1 + (open - close) * (COVER - 1));
 
-	const lift = interpolate(frame, [T.lift, T.lift + 36], [0, -90], {...clamp, easing: smooth});
-	const float = Math.sin((frame - T.lift) / 30) * 5 * interpolate(frame, [T.lift, T.lift + 50], [0, 1], clamp);
-	const logoY = height / 2 + lift + float;
-	const irisTransform = `translate(${cx} ${logoY}) scale(${LOGO_SCALE * iris})`;
+	// Cierre: cada letra que aterriza y la etiqueta al estamparse aplastan un poco el círculo.
+	const badgeHit = T.badge + BADGE_STAMP;
+	const thump =
+		[0, 1, 2, 3, 4, 5].reduce((sum, i) => sum + wobble(frame - letterIn('drop', T.logoBack, i), 5, 0.6), 0) +
+		1.8 * wobble(frame - badgeHit, 6, 0.6);
+	// Al final todo queda "vivo": flota y se mece suavemente.
+	const idle = interpolate(frame, [badgeHit, badgeHit + 60], [0, 1], clamp);
+	const float = Math.sin((frame - badgeHit) / 32) * 7 * idle;
+	const sway = Math.sin((frame - badgeHit) / 46) * 1.8 * idle;
+	const logoY = height / 2 + END_SHIFT * close + float;
+	const irisTransform = `translate(${cx} ${logoY}) rotate(${sway}) scale(${LOGO_SCALE * iris * (1 + 0.012 * thump)} ${LOGO_SCALE * iris * (1 - 0.018 * thump)})`;
 
 	const scene =
 		interpolate(frame, [T.irisOpen + 6, T.irisOpenEnd], [0, 1], clamp) *
 		interpolate(frame, [T.irisClose + 10, T.irisClose + 40], [1, 0], clamp);
-	const burgerOut = interpolate(frame, [T.irisClose - 4, T.irisClose + 26], [0, 1], {...clamp, easing: easeIn});
-	const halo = 1 - scene;
+	const halo = (1 - scene) * (1 + 0.05 * Math.sin(frame / 18) * idle);
+	const ambient = interpolate(frame, [T.irisClose + 20, T.irisClose + 70], [0, 1], clamp);
+
+	// Etiqueta "HAMBURGUESAS": cae como un sello, rebota y se queda torcida con gracia.
+	const stamp = interpolate(frame, [T.badge, badgeHit], [0, 1], {...clamp, easing: Easing.in(Easing.quad)});
+	const badgeWobble = wobble(frame - badgeHit, 6, 0.6);
+	const badgeScale = 1.9 - 0.9 * stamp;
+	const badgeTilt = spring({frame: frame - T.badge, fps, config: {damping: 9, stiffness: 120}});
+	const badgeRot = -16 + 12 * badgeTilt - sway * 0.8;
 
 	// Textos de la escena de la hamburguesa
 	const textOut = interpolate(frame, [T.sceneOut, T.sceneOut + 26], [0, 1], {...clamp, easing: smooth});
 	const sonreirPop = spring({frame: frame - (T.tagline + 14), fps, config: {damping: 10, stiffness: 140, mass: 0.8}});
 	const taglineSmile = interpolate(frame, [T.tagline + 36, T.tagline + 62], [0, 1], {...clamp, easing: smooth});
 	const taglineHappy = wobble(frame - (T.tagline + 58), 6, 0.7);
-
-	// Cierre
-	const endIn = interpolate(frame, [T.endText, T.endText + 50], [0, 1], {...clamp, easing: easeOut});
 
 	return (
 		<AbsoluteFill style={{background: `radial-gradient(circle at 50% 46%, #0F2A18 0%, ${C.black} 62%)`, fontFamily: FONT}}>
@@ -151,12 +194,18 @@ export const HalysReel: React.FC = () => {
 
 				{/* resplandor detrás del logo */}
 				<circle cx={cx} cy={logoY} r={720 * LOGO_SCALE * iris} fill="url(#halo)" opacity={halo} />
+				{ambient > 0 && (
+					<g opacity={0.55 * ambient}>
+						<Seeds />
+					</g>
+				)}
 
 				<g transform={`translate(${cx} ${logoY}) scale(${LOGO_SCALE})`}>
 					<Ripple at={8} />
 					<Ripple at={18} />
-					<Ripple at={T.irisClose + 12} />
-					<Ripple at={T.irisClose + 22} />
+					<Ripple at={T.irisClose + 14} />
+					<Ripple at={T.irisClose + 24} />
+					<Ripple at={badgeHit} />
 				</g>
 
 				<g transform={irisTransform}>
@@ -171,18 +220,36 @@ export const HalysReel: React.FC = () => {
 							<Sunburst />
 						</g>
 						<Seeds />
-						<g
-							opacity={1 - burgerOut}
-							transform={`translate(${cx} ${BURGER_Y + (logoY - BURGER_Y) * burgerOut}) scale(${BURGER_SCALE * (1 - 0.8 * burgerOut)})`}
-						>
-							<Burger start={T.burger} />
+						<g transform={`translate(${cx} ${BURGER_Y}) scale(${BURGER_SCALE})`}>
+							<Burger start={T.burger} crouchAt={T.burgerCrouch} launchAt={T.burgerLaunch} />
 						</g>
 					</g>
 				)}
 
 				<g transform={irisTransform}>
-					<LogoMark id="intro" start={T.logoIn} exitStart={T.irisOpen} />
-					<LogoMark id="outro" start={T.logoBack} />
+					<LogoMark id="intro" entry="pop" start={T.logoIn} exitStart={T.irisOpen} />
+					<LogoMark id="outro" entry="drop" start={T.logoBack} winkAt={T.wink} />
+				</g>
+
+				{/* destellos al estamparse la etiqueta y en el guiño */}
+				<g transform={`translate(${cx} ${logoY})`}>
+					{SPARKLES.map(([angle, dist, size, color], i) => {
+						const a = (angle * Math.PI) / 180;
+						return (
+							<Sparkle
+								key={i}
+								x={Math.cos(a) * dist}
+								y={Math.sin(a) * dist}
+								size={size}
+								color={color}
+								at={badgeHit + i * 2}
+								drift={0.12}
+							/>
+						);
+					})}
+					<Sparkle x={262} y={-150} size={36} color={C.cheese} at={T.wink + 8} />
+					<Sparkle x={322} y={-88} size={26} color={C.white} at={T.wink + 12} />
+					<Sparkle x={222} y={-212} size={20} color={C.cream} at={T.wink + 16} />
 				</g>
 			</svg>
 
@@ -249,26 +316,38 @@ export const HalysReel: React.FC = () => {
 				</div>
 			)}
 
-			{/* cierre */}
-			{endIn > 0 && (
+			{/* etiqueta del cierre */}
+			{frame >= T.badge && (
 				<div
 					style={{
 						position: 'absolute',
-						top: height / 2 - 90 + 410 + 74,
+						top: logoY + BADGE_OFFSET,
 						width: '100%',
-						textAlign: 'center',
-						fontSize: 50,
-						fontWeight: 800,
-						color: C.white,
-						opacity: 0.92 * endIn,
-						letterSpacing: `${interpolate(endIn, [0, 1], [0.9, 0.4])}em`,
-						paddingLeft: `${interpolate(endIn, [0, 1], [0.9, 0.4])}em`,
-						filter: `blur(${(1 - endIn) * 10}px)`,
+						display: 'flex',
+						justifyContent: 'center',
 					}}
 				>
-					HAMBURGUESAS
+					<div
+						style={{
+							transform: `translateY(-50%) rotate(${badgeRot}deg) scale(${badgeScale * (1 + 0.1 * badgeWobble)}, ${badgeScale * (1 - 0.12 * badgeWobble)})`,
+							opacity: interpolate(frame, [T.badge, T.badge + 4], [0, 1], clamp),
+							background: C.white,
+							color: C.green,
+							borderRadius: 999,
+							padding: '24px 54px 22px',
+							fontSize: 66,
+							fontWeight: 900,
+							letterSpacing: '0.05em',
+							lineHeight: 1,
+							boxShadow: `inset 0 0 0 6px ${C.green}, 0 0 0 7px ${C.white}, 0 22px 44px rgba(0, 0, 0, 0.45)`,
+						}}
+					>
+						HAMBURGUESAS
+					</div>
 				</div>
 			)}
+
+			<Soundtrack />
 		</AbsoluteFill>
 	);
 };
