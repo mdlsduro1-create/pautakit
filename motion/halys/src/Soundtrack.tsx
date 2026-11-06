@@ -1,7 +1,7 @@
 import React from 'react';
 import {Html5Audio, Sequence, staticFile} from 'remotion';
 import {LAYER_LANDINGS, SEEDS_START, SHINE_START} from './Burger';
-import {BADGE_STAMP, letterIn, smileStartFor, T} from './timeline';
+import {CELEBRATE, letterIn, smileStartFor, T} from './timeline';
 
 // Efectos de sonido (generados con scripts/sfx.py), sincronizados con el guion.
 const MASTER = 0.85;
@@ -49,9 +49,8 @@ const CUES: Cue[] = [
 		{at: letterIn('drop', T.logoBack, i), sfx: 'thud', volume: 0.22},
 	]),
 	{at: smileStartFor('drop', T.logoBack), sfx: 'swoop', volume: 0.2},
-	{at: smileStartFor('drop', T.logoBack) + 20, sfx: 'boing', volume: 0.4},
-	{at: T.badge + BADGE_STAMP, sfx: 'jingle', volume: 0.6},
-	{at: T.badge + BADGE_STAMP + 2, sfx: 'ting', volume: 0.3},
+	{at: CELEBRATE, sfx: 'jingle', volume: 0.6},
+	{at: CELEBRATE + 2, sfx: 'ting', volume: 0.3},
 	{at: T.wink, sfx: 'blip', volume: 0.4},
 	{at: T.wink + 8, sfx: 'ting', volume: 0.18},
 ];

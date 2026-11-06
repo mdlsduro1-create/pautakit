@@ -1,19 +1,17 @@
 import React from 'react';
-import {AbsoluteFill, Easing, interpolate, random, spring, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, interpolate, random, spring, useCurrentFrame, useVideoConfig} from 'remotion';
 import {clamp, easeOut, smooth, wobble} from './anim';
 import {Burger} from './Burger';
 import {FONT} from './fonts';
 import {DrawnSmile, LogoMark} from './Logo';
 import {C} from './theme';
 import {Soundtrack} from './Soundtrack';
-import {BADGE_STAMP, letterIn, T} from './timeline';
+import {CELEBRATE, letterIn, T} from './timeline';
 
 const LOGO_SCALE = 0.82; // radio del círculo: 500 * 0.82 = 410 px
 const COVER = 3.1; // escala del círculo para tapar toda la pantalla vertical
 const BURGER_Y = 1000;
 const BURGER_SCALE = 1.08;
-const END_SHIFT = -40; // en el cierre el logo queda un poco más arriba para dejar sitio a la etiqueta
-const BADGE_OFFSET = 400; // la etiqueta se pega sobre el borde inferior del círculo (radio 410 px)
 
 // Destellos alrededor del logo: [ángulo, distancia en px, tamaño, color]
 const SPARKLES: [number, number, number, string][] = [
@@ -144,16 +142,15 @@ export const HalysReel: React.FC = () => {
 	const close = spring({frame: frame - T.irisClose, fps, config: {damping: 15, stiffness: 85}});
 	const iris = pop * (1 + (open - close) * (COVER - 1));
 
-	// Cierre: cada letra que aterriza y la etiqueta al estamparse aplastan un poco el círculo.
-	const badgeHit = T.badge + BADGE_STAMP;
+	// Cierre: cada letra que aterriza y el festejo final aplastan un poco el círculo.
 	const thump =
 		[0, 1, 2, 3, 4, 5].reduce((sum, i) => sum + wobble(frame - letterIn('drop', T.logoBack, i), 5, 0.6), 0) +
-		1.8 * wobble(frame - badgeHit, 6, 0.6);
+		1.8 * wobble(frame - CELEBRATE, 6, 0.6);
 	// Al final todo queda "vivo": flota y se mece suavemente.
-	const idle = interpolate(frame, [badgeHit, badgeHit + 60], [0, 1], clamp);
-	const float = Math.sin((frame - badgeHit) / 32) * 7 * idle;
-	const sway = Math.sin((frame - badgeHit) / 46) * 1.8 * idle;
-	const logoY = height / 2 + END_SHIFT * close + float;
+	const idle = interpolate(frame, [CELEBRATE, CELEBRATE + 60], [0, 1], clamp);
+	const float = Math.sin((frame - CELEBRATE) / 32) * 7 * idle;
+	const sway = Math.sin((frame - CELEBRATE) / 46) * 1.8 * idle;
+	const logoY = height / 2 + float;
 	const irisTransform = `translate(${cx} ${logoY}) rotate(${sway}) scale(${LOGO_SCALE * iris * (1 + 0.012 * thump)} ${LOGO_SCALE * iris * (1 - 0.018 * thump)})`;
 
 	const scene =
@@ -161,13 +158,6 @@ export const HalysReel: React.FC = () => {
 		interpolate(frame, [T.irisClose + 10, T.irisClose + 40], [1, 0], clamp);
 	const halo = (1 - scene) * (1 + 0.05 * Math.sin(frame / 18) * idle);
 	const ambient = interpolate(frame, [T.irisClose + 20, T.irisClose + 70], [0, 1], clamp);
-
-	// Etiqueta "HAMBURGUESAS": cae como un sello, rebota y se queda torcida con gracia.
-	const stamp = interpolate(frame, [T.badge, badgeHit], [0, 1], {...clamp, easing: Easing.in(Easing.quad)});
-	const badgeWobble = wobble(frame - badgeHit, 6, 0.6);
-	const badgeScale = 1.9 - 0.9 * stamp;
-	const badgeTilt = spring({frame: frame - T.badge, fps, config: {damping: 9, stiffness: 120}});
-	const badgeRot = -16 + 12 * badgeTilt - sway * 0.8;
 
 	// Textos de la escena de la hamburguesa
 	const textOut = interpolate(frame, [T.sceneOut, T.sceneOut + 26], [0, 1], {...clamp, easing: smooth});
@@ -205,7 +195,7 @@ export const HalysReel: React.FC = () => {
 					<Ripple at={18} />
 					<Ripple at={T.irisClose + 14} />
 					<Ripple at={T.irisClose + 24} />
-					<Ripple at={badgeHit} />
+					<Ripple at={CELEBRATE} />
 				</g>
 
 				<g transform={irisTransform}>
@@ -231,7 +221,7 @@ export const HalysReel: React.FC = () => {
 					<LogoMark id="outro" entry="drop" start={T.logoBack} winkAt={T.wink} />
 				</g>
 
-				{/* destellos al estamparse la etiqueta y en el guiño */}
+				{/* destellos cuando el logo sonríe y en el guiño */}
 				<g transform={`translate(${cx} ${logoY})`}>
 					{SPARKLES.map(([angle, dist, size, color], i) => {
 						const a = (angle * Math.PI) / 180;
@@ -242,7 +232,7 @@ export const HalysReel: React.FC = () => {
 								y={Math.sin(a) * dist}
 								size={size}
 								color={color}
-								at={badgeHit + i * 2}
+								at={CELEBRATE + i * 2}
 								drift={0.12}
 							/>
 						);
@@ -313,37 +303,6 @@ export const HalysReel: React.FC = () => {
 					>
 						<DrawnSmile id="tagline-smile" progress={taglineSmile} />
 					</svg>
-				</div>
-			)}
-
-			{/* etiqueta del cierre */}
-			{frame >= T.badge && (
-				<div
-					style={{
-						position: 'absolute',
-						top: logoY + BADGE_OFFSET,
-						width: '100%',
-						display: 'flex',
-						justifyContent: 'center',
-					}}
-				>
-					<div
-						style={{
-							transform: `translateY(-50%) rotate(${badgeRot}deg) scale(${badgeScale * (1 + 0.1 * badgeWobble)}, ${badgeScale * (1 - 0.12 * badgeWobble)})`,
-							opacity: interpolate(frame, [T.badge, T.badge + 4], [0, 1], clamp),
-							background: C.white,
-							color: C.green,
-							borderRadius: 999,
-							padding: '24px 54px 22px',
-							fontSize: 66,
-							fontWeight: 900,
-							letterSpacing: '0.05em',
-							lineHeight: 1,
-							boxShadow: `inset 0 0 0 6px ${C.green}, 0 0 0 7px ${C.white}, 0 22px 44px rgba(0, 0, 0, 0.45)`,
-						}}
-					>
-						HAMBURGUESAS
-					</div>
 				</div>
 			)}
 

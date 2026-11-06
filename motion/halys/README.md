@@ -1,6 +1,6 @@
 # Haly's: animación de marca
 
-Reel vertical de 11,5 s (1080×1920, 60 fps, con efectos de sonido) hecho con [Remotion](https://www.remotion.dev/).
+Reel vertical de 11 s (1080×1920, 60 fps, con efectos de sonido) hecho con [Remotion](https://www.remotion.dev/).
 
 Ya renderizado en `entregables/`:
 
@@ -12,7 +12,7 @@ Ya renderizado en `entregables/`:
 1. **Logo (0–2,3 s):** el círculo verde aparece con un rebote y dos ondas. Las letras de HALY'S entran una a una, la sonrisa se dibuja y el logo hace un "boing".
 2. **Apertura (2,3–3 s):** el círculo crece hasta llenar la pantalla y las letras pasan de largo hacia la cámara.
 3. **Hamburguesa (3–7 s):** las capas caen y aplastan la pila al aterrizar. Pan de abajo, carne, queso que gotea, tomate, lechuga y pan de arriba. Después salen el sésamo, un brillo y el vapor. Los textos dicen "HAMBURGUESAS / que te hacen sonreír", y debajo se dibuja la sonrisa del logo.
-4. **Cierre (7–11,5 s):** la hamburguesa se agacha y sale disparada hacia arriba, y el verde se cierra en el círculo con un rebote. Las letras caen dentro, una a una, con la misma física de las capas. Se dibuja la sonrisa, la etiqueta "HAMBURGUESAS" se estampa bajo el logo con destellos y, al final, el logo hace un guiño.
+4. **Cierre (7–11 s):** la hamburguesa se agacha y sale disparada hacia arriba, y el verde se cierra en el círculo con un rebote. Las letras caen dentro, una a una, con la misma física de las capas. Se dibuja la sonrisa, el logo lo celebra con destellos y, al final, hace un guiño.
 
 ## Sonido
 
